@@ -17,7 +17,8 @@ jest.mock("@budibase/backend-core", () => ({
     },
   },
   context: {
-    getOrThrowWorkspaceId: (...args: any[]) => mockGetOrThrowWorkspaceId(...args),
+    getOrThrowWorkspaceId: (...args: any[]) =>
+      mockGetOrThrowWorkspaceId(...args),
   },
   env: {
     MICROSOFT_CLIENT_ID: "ms-client-id",
@@ -46,7 +47,8 @@ describe("sharepointAuth controller", () => {
     const redirect = jest.fn()
     const ctx = {
       query: {
-        returnPath: "/builder/workspace/app_dev_trusted_workspace/agent/abc/knowledge",
+        returnPath:
+          "/builder/workspace/app_dev_trusted_workspace/agent/abc/knowledge",
         appId: "app_dev_attacker_workspace",
       },
       redirect,
@@ -78,5 +80,36 @@ describe("sharepointAuth controller", () => {
       "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
     )
     expect(redirect.mock.calls[0][0]).toContain("state=state_123")
+  })
+
+  it("ignores a forged workspaceId in query and keeps trusted context workspace", async () => {
+    const redirect = jest.fn()
+    const ctx = {
+      query: {
+        returnPath:
+          "/builder/workspace/app_dev_attacker_workspace/agent/abc/knowledge",
+        workspaceId: "app_dev_attacker_workspace",
+      },
+      redirect,
+    } as any
+
+    await startSharePointAuth(ctx)
+
+    expect(mockCacheStore).toHaveBeenCalledWith(
+      "datasource:microsoft:state:state_123",
+      {
+        workspaceId: "app_dev_trusted_workspace",
+        provider: "microsoft",
+      },
+      600
+    )
+    expect(mockSetCookie).toHaveBeenCalledWith(
+      ctx,
+      expect.objectContaining({
+        workspaceId: "app_dev_trusted_workspace",
+      }),
+      "datasourceAuth"
+    )
+    expect(redirect).toHaveBeenCalledTimes(1)
   })
 })
