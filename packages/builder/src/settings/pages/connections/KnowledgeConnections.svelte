@@ -32,14 +32,13 @@
   )
 
   const connectSharePoint = () => {
-    const appId = $appStore.appId
-    if (!appId) {
-      notifications.error("Missing app context to connect SharePoint")
+    if (!$appStore.appId) {
+      notifications.error("Missing workspace context to connect SharePoint")
       return
     }
     const returnPath = window.location.pathname
-    const oauthUrl = `/api/agent/knowledge-sources/sharepoint/connect?appId=${encodeURIComponent(appId)}&returnPath=${encodeURIComponent(returnPath)}`
-    window.location.href = oauthUrl
+    const connectUrl = `/api/${$appStore.appId}/agent/knowledge-sources/sharepoint/connect?returnPath=${encodeURIComponent(returnPath)}`
+    window.location.assign(connectUrl)
   }
 
   onMount(async () => {

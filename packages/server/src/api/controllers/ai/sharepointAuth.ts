@@ -37,16 +37,15 @@ const appendQueryParam = (path: string, key: string, value: string) => {
   return `${url.pathname}${qs ? `?${qs}` : ""}`
 }
 
-export async function startSharePointAuth(ctx: UserCtx<void, void>) {
-  const appId = String(ctx.query.appId || "").trim()
+export async function startSharePointAuth(
+  ctx: UserCtx<void, void, { returnPath?: string }>
+) {
+  const workspaceId = context.getOrThrowWorkspaceId()
   const returnPath =
     typeof ctx.query.returnPath === "string" ? ctx.query.returnPath : undefined
 
-  if (!appId) {
-    ctx.throw(400, "appId query param not present.")
-  }
   console.log("Starting SharePoint OAuth flow", {
-    appId,
+    workspaceId,
     hasReturnPath: !!returnPath,
   })
 
@@ -58,7 +57,7 @@ export async function startSharePointAuth(ctx: UserCtx<void, void>) {
   await cache.store(
     `datasource:${MICROSOFT_PROVIDER}:state:${state}`,
     {
-      appId,
+      workspaceId,
       provider: MICROSOFT_PROVIDER,
     },
     STATE_CACHE_TTL_SECONDS
@@ -68,7 +67,7 @@ export async function startSharePointAuth(ctx: UserCtx<void, void>) {
     ctx,
     {
       provider: MICROSOFT_PROVIDER,
-      appId,
+      workspaceId,
       returnPath,
     } satisfies DatasourceAuthCookie,
     constants.Cookie.DatasourceAuth
@@ -100,18 +99,20 @@ export async function completeSharePointAuth(ctx: UserCtx<void, void>) {
   }
   const statePayload = (await cache.get(
     `datasource:${MICROSOFT_PROVIDER}:state:${state}`
-  )) as { appId?: string; provider?: string }
+  )) as { workspaceId?: string; provider?: string }
   await cache.destroy(`datasource:${MICROSOFT_PROVIDER}:state:${state}`)
-  const stateAppId =
-    typeof statePayload?.appId === "string" ? statePayload.appId.trim() : ""
+  const stateWorkspaceId =
+    typeof statePayload?.workspaceId === "string"
+      ? statePayload.workspaceId.trim()
+      : ""
   if (
     !statePayload ||
-    !stateAppId ||
+    !stateWorkspaceId ||
     statePayload.provider !== MICROSOFT_PROVIDER
   ) {
     throw new Error("Microsoft OAuth state is invalid or expired")
   }
-  const appId = stateAppId
+  const appId = stateWorkspaceId
 
   const oauthError = String(ctx.query.error || "").trim()
   if (oauthError) {

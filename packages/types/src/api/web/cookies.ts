@@ -1,5 +1,5 @@
 export interface DatasourceAuthCookie {
-  appId: string
+  workspaceId: string
   provider: string
   returnPath?: string
 }
