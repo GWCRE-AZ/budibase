@@ -23,9 +23,7 @@ import {
 import {
   stepNode,
   anchorNode,
-  branchNode,
   edgeAddItem,
-  edgeBranchAddItem,
   edgeLoopAddItem,
 } from "./FlowFactories"
 
@@ -118,6 +116,7 @@ const placeBranchCluster = (args: PlaceBranchClusterArgs) => {
   const branches: Branch[] = step.inputs?.branches || []
   const childrenMap: Record<string, AutomationStep[]> =
     step.inputs?.children || {}
+  const switchNodeId = baseId
 
   const isLR = deps.layoutDirection === "LR"
 
@@ -136,57 +135,24 @@ const placeBranchCluster = (args: PlaceBranchClusterArgs) => {
     Math.max(0, branches.length - 1) * visuals.gap
   const stackStartY = coords.y - totalBranchesHeight / 2
 
+  deps.newNodes.push(
+    stepNode(switchNodeId, step, parentId, {
+      x: coords.x || 0,
+      y: coords.y,
+    })
+  )
+  deps.newEdges.push(
+    edgeAddItem(source.id, switchNodeId, {
+      block: source.block,
+      ...(source.pathTo ? { pathTo: source.pathTo } : {}),
+    })
+  )
+
+  const branchStartY =
+    coords.y +
+    (mode === BranchMode.TOPLEVEL ? deps.ySpacing : visuals.laneYSpacing)
+
   branches.forEach((branch, bIdx) => {
-    const branchNodeId = `branch-${baseId}-${bIdx}-${branch.id}`
-
-    if (mode === BranchMode.TOPLEVEL) {
-      deps.newNodes.push(
-        branchNode(branchNodeId, step, branch, bIdx, undefined, undefined, {
-          x: 0,
-          y: coords.y,
-        })
-      )
-    } else {
-      let branchX: number
-      let branchY: number
-      if (isLR && mode === BranchMode.SUBFLOW) {
-        branchX = coords.x ?? 40
-        branchY = stackStartY + bIdx * (BRANCH.height + visuals.gap)
-      } else {
-        branchX = Math.round(centers[bIdx] - visuals.laneWidth / 2)
-        branchY = coords.y
-      }
-      deps.newNodes.push(
-        branchNode(
-          branchNodeId,
-          step,
-          branch,
-          bIdx,
-          parentId,
-          visuals.laneWidth,
-          { x: branchX, y: branchY }
-        )
-      )
-    }
-
-    deps.newEdges.push(
-      edgeBranchAddItem(source.id, branchNodeId, {
-        block: source.block,
-        isPrimaryEdge: bIdx === Math.floor((branches.length - 1) / 2),
-        branchStepId: baseId,
-        branchIdx: bIdx,
-        branchesCount: branches.length,
-        pathTo: source.pathTo,
-        isSubflowEdge: mode === BranchMode.SUBFLOW,
-        ...(loopContext
-          ? {
-              loopStepId: loopContext.loopStepId,
-              loopChildInsertIndex: loopContext.loopChildInsertIndex,
-            }
-          : {}),
-      })
-    )
-
     const parentPath = deps.blockRefs[baseId]?.pathTo || []
     const childSteps: AutomationStep[] = filterLegacyLoops(
       childrenMap?.[branch.id] || []
@@ -211,18 +177,16 @@ const placeBranchCluster = (args: PlaceBranchClusterArgs) => {
         childSteps.length > 0
           ? renderChain(
               childSteps,
-              branchNodeId,
+              switchNodeId,
               branchBlockRef,
               0,
-              coords.y + deps.ySpacing,
+              branchStartY,
               deps
             )
           : null
-      const bottomY = chainResult
-        ? chainResult.bottomY
-        : coords.y + deps.ySpacing
+      const bottomY = chainResult ? chainResult.bottomY : branchStartY
       if (!chainResult?.branched) {
-        const terminalId = `anchor-${chainResult ? chainResult.lastNodeId : branchNodeId}`
+        const terminalId = `anchor-${baseId}-${bIdx}-${branch.id}`
         const terminalBlock = chainResult
           ? chainResult.lastNodeBlock
           : branchBlockRef
@@ -230,7 +194,7 @@ const placeBranchCluster = (args: PlaceBranchClusterArgs) => {
         pushAnchor(terminalId, bottomY, deps)
         deps.newEdges.push(
           edgeAddItem(
-            chainResult ? chainResult.lastNodeId : branchNodeId,
+            chainResult ? chainResult.lastNodeId : switchNodeId,
             terminalId,
             {
               block: terminalBlock,
@@ -252,7 +216,7 @@ const placeBranchCluster = (args: PlaceBranchClusterArgs) => {
         const branchY = stackStartY + bIdx * (BRANCH.height + visuals.gap)
         const childY = branchY + BRANCH.height / 2 - SUBFLOW.childHeight / 2
         let childX = branchX + visuals.laneWidth + SUBFLOW.internalSpacing
-        let prevId: string = branchNodeId
+        let prevId: string = switchNodeId
         let prevBlock: FlowBlockContext = branchBlockRef
 
         branchChildren.forEach(child => {
@@ -274,7 +238,7 @@ const placeBranchCluster = (args: PlaceBranchClusterArgs) => {
           childX += SUBFLOW.stepWidth + SUBFLOW.internalSpacing
         })
 
-        const anchorId = `anchor-${branchNodeId}`
+        const anchorId = `anchor-${baseId}-${bIdx}-${branch.id}`
         deps.newNodes.push(
           anchorNode(anchorId, parentId, {
             x: childX,
@@ -299,8 +263,8 @@ const placeBranchCluster = (args: PlaceBranchClusterArgs) => {
         const childLeft = Math.round(
           left + (visuals.laneWidth - visuals.anchorWidth) / 2
         )
-        let laneY = coords.y + visuals.laneYSpacing
-        let prevId: string = branchNodeId
+        let laneY = branchStartY
+        let prevId: string = switchNodeId
         let prevBlock: FlowBlockContext = branchBlockRef
 
         branchChildren.forEach(child => {
@@ -322,7 +286,7 @@ const placeBranchCluster = (args: PlaceBranchClusterArgs) => {
           laneY += SUBFLOW.childHeight + SUBFLOW.internalSpacing
         })
 
-        const anchorId = `anchor-${branchNodeId}`
+        const anchorId = `anchor-${baseId}-${bIdx}-${branch.id}`
         const anchorY = laneY
         deps.newNodes.push(
           anchorNode(anchorId, parentId, {

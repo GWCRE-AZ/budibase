@@ -3,7 +3,6 @@
     getSmoothStepPath,
     BaseEdge,
     getStraightPath,
-    useSvelteFlow,
     type Position,
   } from "@xyflow/svelte"
   import { getContext } from "svelte"
@@ -53,7 +52,6 @@
   const layoutDirection = getContext<Writable<"LR" | "TB">>(
     "flowLayoutDirection"
   )
-  const flow = useSvelteFlow()
 
   const deriveBlockContext = (
     edgeData: EdgeData | undefined
@@ -105,13 +103,18 @@
       : false
   $: isSubflowEdge = data.isSubflowEdge === true
   $: isLR = $layoutDirection !== "TB"
+  $: isEmptyBranchAnchor =
+    isAnchorTarget && block ? isBranchContext(block) : false
 
   $: if (isAnchorTarget || (isLR && (isLoopTarget || isLoopSource))) {
-    labelX = isLR
-      ? Math.round(((sourceX ?? 0) + (targetX ?? 0)) / 2)
-      : (sourceX ?? 0)
-    labelY =
-      isLR && isLoopSource
+    labelX = isEmptyBranchAnchor
+      ? (targetX ?? 0)
+      : isLR
+        ? Math.round(((sourceX ?? 0) + (targetX ?? 0)) / 2)
+        : (sourceX ?? 0)
+    labelY = isEmptyBranchAnchor
+      ? (targetY ?? 0)
+      : isLR && isLoopSource
         ? (targetY ?? 0)
         : isLR
           ? (sourceY ?? 0)
@@ -121,14 +124,15 @@
   $: loopTargetPath = isLR && isLoopTarget ? getLoopTargetPath() : undefined
   $: loopSourcePath = isLR && isLoopSource ? getLoopSourcePath() : undefined
 
-  $: edgePath = isAnchorTarget
-    ? getStraightPath({
-        sourceX,
-        sourceY,
-        targetX: labelX,
-        targetY: labelY,
-      })[0]
-    : loopTargetPath || loopSourcePath || basePath[0]
+  $: edgePath =
+    isAnchorTarget && !isEmptyBranchAnchor
+      ? getStraightPath({
+          sourceX,
+          sourceY,
+          targetX: labelX,
+          targetY: labelY,
+        })[0]
+      : loopTargetPath || loopSourcePath || basePath[0]
 
   $: blockId = resolveBlockId(data?.block as FlowBlockContext | undefined)
   $: blockRef = blockId ? $selectedAutomation?.blockRefs?.[blockId] : undefined
@@ -208,22 +212,6 @@
       return ctx.branchStepId
     }
     return ctx.id
-  }
-
-  const handleBranch = () => {
-    const targetPath = blockRef?.pathTo
-    if (targetPath && automation) {
-      automationStore.actions.branchAutomation(targetPath, automation)
-    }
-  }
-
-  const handleAddBranch = () => {
-    if (!isBranchEdgeData(data)) return
-    const targetRef = $selectedAutomation?.blockRefs?.[data.branchStepId]
-    if (targetRef && automation) {
-      automationStore.actions.branchAutomation(targetRef.pathTo, automation)
-    }
-    flow.fitView()
   }
 
   const getLoopTargetPath = () => {
@@ -364,7 +352,6 @@
 <!-- Branch edge -->
 {#if isBranchEdgeData(data)}
   <BranchEdgeLabels
-    {data}
     {labelX}
     {labelY}
     {preBranchLabelX}
@@ -376,10 +363,6 @@
     {collectBlockExists}
     {sourcePathForDrop}
     {block}
-    {handleBranch}
-    {handleAddBranch}
-    {viewMode}
-    {isPrimaryBranchEdge}
     edgeDzWidth={dzWidth}
     edgeDzOffsetY={dzOffsetY}
     {preDzWidth}
@@ -395,7 +378,6 @@
     {collectBlockExists}
     {sourcePathForDrop}
     {block}
-    {handleBranch}
     {dzWidth}
     {dzOffsetY}
   />

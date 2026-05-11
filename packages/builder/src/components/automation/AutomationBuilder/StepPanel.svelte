@@ -60,6 +60,7 @@
   let confirmCascadeDialog: any
   let confirmBranchDeleteDialog: any
   let editableBranchConditionUI: any = {}
+  let editableBranchIdx: number | undefined
 
   $: memoAutomation.set($selectedAutomation.data)
   $: memoContext.set($evaluationContext)
@@ -80,6 +81,12 @@
     $memoAutomation,
     branchStepRef
   )
+  $: switchStep = block && isBranchStep(block) ? block : undefined
+  $: switchStepRef = switchStep ? blockRef : undefined
+  $: conditionStep =
+    branchStep && isBranchStep(branchStep) ? branchStep : switchStep
+  $: conditionStepRef =
+    branchStep && isBranchStep(branchStep) ? branchStepRef : switchStepRef
   $: selectedBranch =
     branchStep && isBranchStep(branchStep) && selectedBranchNode
       ? branchStep.inputs?.branches?.[selectedBranchNode.branchIdx]
@@ -100,7 +107,10 @@
           id: selectedBranchNode.stepId,
         })
       : undefined
-  $: editableBranchConditionUI = selectedBranch?.conditionUI || {}
+  $: if (selectedBranch) {
+    editableBranchConditionUI = selectedBranch.conditionUI || {}
+    editableBranchIdx = undefined
+  }
 
   $: memoBlock.set(block)
 
@@ -130,10 +140,9 @@
   $: isAppAction &&
     automationStore.actions.setPermissions(role, $memoAutomation)
 
-  $: availableBranchBindings =
-    selectedBranchNode && branchStep
-      ? automationStore.actions.getPathBindings(branchStep.id, $memoAutomation)
-      : []
+  $: availableBranchBindings = conditionStep
+    ? automationStore.actions.getPathBindings(conditionStep.id, $memoAutomation)
+    : []
   $: environmentBindings =
     $memoEnvVariables && automationStore.actions.buildEnvironmentBindings()
   $: userBindings = automationStore.actions.buildUserBindings()
@@ -285,12 +294,17 @@
   }
 
   const saveBranchCondition = async () => {
+    const targetBranchIdx = selectedBranchNode?.branchIdx ?? editableBranchIdx
+    const targetBranch =
+      conditionStep && isBranchStep(conditionStep)
+        ? conditionStep.inputs?.branches?.[targetBranchIdx ?? -1]
+        : undefined
     if (
-      !branchStep ||
-      !isBranchStep(branchStep) ||
-      !selectedBranch ||
-      !selectedBranchNode ||
-      !branchStepRef ||
+      !conditionStep ||
+      !isBranchStep(conditionStep) ||
+      !targetBranch ||
+      !Number.isInteger(targetBranchIdx) ||
+      !conditionStepRef ||
       !$memoAutomation
     ) {
       return
@@ -299,13 +313,12 @@
     branchConditionDrawer?.hide()
     const updatedConditionsUI = Utils.parseFilter(editableBranchConditionUI)
     const updatedBranch: Branch = {
-      ...selectedBranch,
+      ...targetBranch,
       conditionUI: updatedConditionsUI as Branch["conditionUI"],
       condition: QueryUtils.buildQuery(updatedConditionsUI),
     }
-    const branchStepUpdate = cloneDeep(branchStep)
-    branchStepUpdate.inputs.branches[selectedBranchNode.branchIdx] =
-      updatedBranch
+    const branchStepUpdate = cloneDeep(conditionStep)
+    branchStepUpdate.inputs.branches[targetBranchIdx as number] = updatedBranch
 
     const branchesArray = branchStepUpdate.inputs.branches || []
     for (let i = 0; i < branchesArray.length; i++) {
@@ -320,7 +333,7 @@
     branchStepUpdate.inputs.branches = branchesArray
 
     const updated = automationStore.actions.updateStep(
-      branchStepRef.pathTo,
+      conditionStepRef.pathTo,
       $memoAutomation,
       branchStepUpdate
     )
@@ -380,13 +393,44 @@
       branchIdx: targetIdx,
     })
   }
+
+  const addSwitchCondition = async () => {
+    if (!switchStep || !switchStepRef || !$selectedAutomation.data) {
+      return
+    }
+    await automationStore.actions.addBranchCondition(
+      switchStepRef.pathTo,
+      $selectedAutomation.data
+    )
+  }
+
+  const deleteSwitchCondition = async (branchIdx: number) => {
+    if (!switchStepRef || !$selectedAutomation.data) {
+      return
+    }
+    await automationStore.actions.deleteBranchCondition(
+      switchStepRef.pathTo,
+      $selectedAutomation.data,
+      branchIdx
+    )
+  }
+
+  const editSwitchCondition = (branchIdx: number) => {
+    const branch = switchStep?.inputs?.branches?.[branchIdx]
+    if (!branch) {
+      return
+    }
+    editableBranchIdx = branchIdx
+    editableBranchConditionUI = branch.conditionUI || {}
+    branchConditionDrawer?.show()
+  }
 </script>
 
 <Modal bind:this={webhookModal}>
   <CreateWebhookModal />
 </Modal>
 
-<Drawer bind:this={branchConditionDrawer} title="Branch condition" forceModal>
+<Drawer bind:this={branchConditionDrawer} title="Condition" forceModal>
   <Button cta slot="buttons" on:click={saveBranchCondition}>Save</Button>
   <DrawerContent slot="body">
     <FilterBuilder
@@ -549,6 +593,8 @@
         <Button
           secondary
           on:click={() => {
+            editableBranchIdx = undefined
+            editableBranchConditionUI = selectedBranch.conditionUI || {}
             branchConditionDrawer?.show()
           }}
         >
@@ -557,6 +603,28 @@
             : "Add condition"}
         </Button>
       </PropField>
+    {:else if switchStep}
+      <InfoDisplay
+        icon="info"
+        body="Checks each condition in order and follows the first one that matches."
+      />
+      <div class="conditions">
+        {#each switchStep.inputs?.branches || [] as branch, idx}
+          <div class="condition-row">
+            <Button secondary on:click={() => editSwitchCondition(idx)}>
+              {idx + 1}. {branch.conditionUI?.groups?.length
+                ? branch.name
+                : "Add condition"}
+            </Button>
+            <Icon
+              name="trash"
+              hoverable
+              on:click={() => deleteSwitchCondition(idx)}
+            />
+          </div>
+        {/each}
+        <Button secondary on:click={addSwitchCondition}>Add condition</Button>
+      </div>
     {:else if loopBlock || $memoBlock?.stepId === AutomationActionStepId.LOOP_V2}
       <div class="loop">
         <DetailSummary name="Loop details" padded={false} initiallyShow>
@@ -684,10 +752,17 @@
     padding: var(--spacing-l);
   }
   .config.panel .loop,
+  .config.panel .conditions,
   .config.panel .content .props {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-l);
+  }
+  .condition-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--spacing-m);
+    align-items: center;
   }
   .config.panel :global(.spectrum-Divider) {
     flex: 0 0 auto;
