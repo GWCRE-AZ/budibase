@@ -17,7 +17,12 @@ describe("agent duplicate", () => {
       aiconfig: "default",
       description: "Support assistant",
       promptInstructions: "Be helpful",
-      live: true,
+      operations: [
+        {
+          id: "operation_original",
+          name: "Access requests",
+        },
+      ],
     })
 
     const duplicate = await config.api.agent.duplicate(created._id!)
@@ -29,6 +34,47 @@ describe("agent duplicate", () => {
     expect(duplicate.description).toEqual(created.description)
     expect(duplicate.promptInstructions).toEqual(created.promptInstructions)
     expect(duplicate.live).toEqual(created.live)
+    expect(duplicate.operations).toEqual([
+      expect.objectContaining({
+        name: "Access requests",
+      }),
+    ])
+    expect(duplicate.operations?.[0].id).not.toEqual(created.operations?.[0].id)
+  })
+
+  it("persists agent operations", async () => {
+    const created = await config.api.agent.create({
+      name: "Operations Agent",
+      aiconfig: "default",
+      operations: [
+        {
+          id: "operation_access",
+          name: "Access requests",
+        },
+      ],
+    })
+
+    const updated = await config.api.agent.update({
+      ...created,
+      operations: [
+        ...(created.operations || []),
+        {
+          id: "operation_it",
+          name: "IT support",
+        },
+      ],
+    })
+
+    expect(updated.operations).toEqual([
+      expect.objectContaining({
+        id: "operation_access",
+        name: "Access requests",
+      }),
+      expect.objectContaining({
+        id: "operation_it",
+        name: "IT support",
+      }),
+    ])
   })
 
   it("returns 404 for unknown agent", async () => {

@@ -112,6 +112,18 @@ export async function status() {
       goal: agent.goal,
       live: agent.live,
       enabledTools: normalizeArray(agent.enabledTools || []),
+      operations: (agent.operations || [])
+        .map(operation => ({
+          id: operation.id,
+          name: operation.name,
+          promptInstructions: operation.promptInstructions,
+          enabledTools: normalizeArray(operation.enabledTools || []),
+          knowledgeBases: normalizeArray(operation.knowledgeBases || []),
+          knowledgeSources: (operation.knowledgeSources || [])
+            .map(source => toComparableKnowledgeSource(source))
+            .sort((a, b) => a.id.localeCompare(b.id)),
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id)),
       discordIntegration: agent.discordIntegration
         ? {
             applicationId: agent.discordIntegration.applicationId,

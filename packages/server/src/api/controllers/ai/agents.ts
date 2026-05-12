@@ -295,6 +295,7 @@ export async function createAgent(
     discordIntegration: body.discordIntegration,
     MSTeamsIntegration: body.MSTeamsIntegration,
     slackIntegration: body.slackIntegration,
+    operations: body.operations,
     knowledgeSources: undefined,
     knowledgeBases: undefined,
   }
@@ -347,6 +348,7 @@ export async function updateAgent(
     live: body.live,
     publishedAt: undefined,
     enabledTools: body.enabledTools,
+    operations: body.operations,
     discordIntegration: body.discordIntegration,
     MSTeamsIntegration: body.MSTeamsIntegration,
     slackIntegration: body.slackIntegration,

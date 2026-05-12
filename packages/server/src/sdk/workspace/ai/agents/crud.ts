@@ -9,6 +9,7 @@ import { DocumentType } from "@budibase/types"
 import type { Agent, Optional } from "@budibase/types"
 import { helpers } from "@budibase/shared-core"
 import * as knowledgeBaseSdk from "../knowledgeBase"
+import { v4 } from "uuid"
 
 const SECRET_MASK = "********"
 const SECRET_ENCODING_PREFIX = "bbai_enc::"
@@ -107,6 +108,7 @@ const withAgentDefaults = (agent: Agent): Agent => ({
   live: agent.live ?? false,
   enabledTools: agent.enabledTools || [],
   knowledgeBases: agent.knowledgeBases || [],
+  operations: agent.operations || [],
   discordIntegration: decodeDiscordIntegrationSecrets(agent.discordIntegration),
   slackIntegration: decodeSlackIntegrationSecrets(agent.slackIntegration),
 })
@@ -256,6 +258,7 @@ export async function create(
     discordIntegration: request.discordIntegration,
     MSTeamsIntegration: request.MSTeamsIntegration,
     slackIntegration: request.slackIntegration,
+    operations: request.operations || [],
   }
 
   const { rev } = await db.put({
@@ -294,6 +297,10 @@ export async function duplicate(
     createdBy,
     enabledTools: source.enabledTools || [],
     knowledgeBases: source.knowledgeBases || [],
+    operations: (source.operations || []).map(operation => ({
+      ...operation,
+      id: `operation_${v4()}`,
+    })),
   })
 }
 
@@ -325,6 +332,7 @@ export async function update(agent: Agent): Promise<Agent> {
     updatedAt: now,
     enabledTools: agent.enabledTools ?? existing?.enabledTools ?? [],
     knowledgeBases: agent.knowledgeBases ?? existing?.knowledgeBases ?? [],
+    operations: agent.operations ?? existing?.operations ?? [],
     discordIntegration: mergeDiscordIntegration({
       existing: existing?.discordIntegration,
       incoming: agent.discordIntegration,

@@ -39,6 +39,15 @@ const SLACK_INTEGRATION_SCHEMA = Joi.object({
   .optional()
   .allow(null)
 
+const AGENT_OPERATION_SCHEMA = Joi.object({
+  id: OPTIONAL_STRING,
+  name: NON_EMPTY_STRING.required(),
+  promptInstructions: OPTIONAL_STRING,
+  enabledTools: Joi.array().items(Joi.string()).optional(),
+  knowledgeBases: Joi.array().items(Joi.string()).optional(),
+  knowledgeSources: Joi.array().items(Joi.object().unknown(true)).optional(),
+})
+
 export function createAgentValidator() {
   return auth.joiValidator.body(
     Joi.object({
@@ -53,6 +62,7 @@ export function createAgentValidator() {
       discordIntegration: DISCORD_INTEGRATION_SCHEMA,
       MSTeamsIntegration: TEAMS_INTEGRATION_SCHEMA,
       slackIntegration: SLACK_INTEGRATION_SCHEMA,
+      operations: Joi.array().items(AGENT_OPERATION_SCHEMA).optional(),
     })
   )
 }
@@ -78,6 +88,7 @@ export function updateAgentValidator() {
       discordIntegration: DISCORD_INTEGRATION_SCHEMA,
       MSTeamsIntegration: TEAMS_INTEGRATION_SCHEMA,
       slackIntegration: SLACK_INTEGRATION_SCHEMA,
+      operations: Joi.array().items(AGENT_OPERATION_SCHEMA).optional(),
     }).unknown(true)
   )
 }
