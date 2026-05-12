@@ -43,6 +43,7 @@ const AGENT_OPERATION_SCHEMA = Joi.object({
   id: OPTIONAL_STRING,
   name: NON_EMPTY_STRING.required(),
   promptInstructions: OPTIONAL_STRING,
+  live: Joi.boolean().optional(),
   enabledTools: Joi.array().items(Joi.string()).optional(),
   knowledgeBases: Joi.array().items(Joi.string()).optional(),
   knowledgeSources: Joi.array().items(Joi.object().unknown(true)).optional(),

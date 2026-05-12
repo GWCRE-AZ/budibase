@@ -74,6 +74,7 @@ export interface AgentOperation {
   id: string
   name: string
   promptInstructions?: string
+  live?: boolean
   enabledTools?: string[]
   knowledgeBases?: string[]
   knowledgeSources?: AgentKnowledgeSource[]
