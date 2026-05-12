@@ -60,14 +60,19 @@ export interface AgentEndpoints {
     agentId: string,
     enabled: boolean
   ) => Promise<ToggleAgentDeploymentResponse>
-  fetchAgentKnowledge: (agentId: string) => Promise<FetchAgentKnowledgeResponse>
+  fetchAgentKnowledge: (
+    agentId: string,
+    operationId?: string
+  ) => Promise<FetchAgentKnowledgeResponse>
   uploadAgentFile: (
     agentId: string,
-    file: File
+    file: File,
+    operationId?: string
   ) => Promise<AgentFileUploadResponse>
   deleteAgentFile: (
     agentId: string,
-    fileId: string
+    fileId: string,
+    operationId?: string
   ) => Promise<{ deleted: true }>
   fetchAgentKnowledgeSourceOptions: (
     datasourceId: string,
@@ -75,24 +80,29 @@ export interface AgentEndpoints {
   ) => Promise<FetchAgentKnowledgeSourceOptionsResponse>
   fetchAgentKnowledgeSourceAllEntries: (
     agentId: string,
-    siteId: string
+    siteId: string,
+    operationId?: string
   ) => Promise<FetchAgentKnowledgeSourceEntriesResponse>
   connectAgentSharePointSite: (
     agentId: string,
-    body: ConnectAgentSharePointSiteRequest
+    body: ConnectAgentSharePointSiteRequest,
+    operationId?: string
   ) => Promise<ConnectAgentSharePointSiteResponse>
   updateAgentSharePointSite: (
     agentId: string,
     siteId: string,
-    body: UpdateAgentSharePointSiteRequest
+    body: UpdateAgentSharePointSiteRequest,
+    operationId?: string
   ) => Promise<UpdateAgentSharePointSiteResponse>
   disconnectAgentSharePointSite: (
     agentId: string,
-    siteId: string
+    siteId: string,
+    operationId?: string
   ) => Promise<DisconnectAgentSharePointSiteResponse>
   syncAgentKnowledgeSources: (
     agentId: string,
-    sourceId: string
+    sourceId: string,
+    operationId?: string
   ) => Promise<SyncAgentKnowledgeSourcesResponse>
 }
 
@@ -197,25 +207,34 @@ export const buildAgentEndpoints = (API: BaseAPIClient): AgentEndpoints => ({
     })
   },
 
-  fetchAgentKnowledge: async (agentId: string) => {
+  fetchAgentKnowledge: async (agentId: string, operationId?: string) => {
+    const query = operationId
+      ? `?operationId=${encodeURIComponent(operationId)}`
+      : ""
     return await API.get<FetchAgentKnowledgeResponse>({
-      url: `/api/agent/${agentId}/knowledge`,
+      url: `/api/agent/${agentId}/knowledge${query}`,
     })
   },
 
-  uploadAgentFile: async (agentId: string, file: File) => {
+  uploadAgentFile: async (agentId: string, file: File, operationId?: string) => {
     const formData = new FormData()
     formData.append("file", file)
+    const query = operationId
+      ? `?operationId=${encodeURIComponent(operationId)}`
+      : ""
     return await API.post<FormData, AgentFileUploadResponse>({
-      url: `/api/agent/${agentId}/files`,
+      url: `/api/agent/${agentId}/files${query}`,
       body: formData,
       json: false,
     })
   },
 
-  deleteAgentFile: async (agentId: string, fileId: string) => {
+  deleteAgentFile: async (agentId: string, fileId: string, operationId?: string) => {
+    const query = operationId
+      ? `?operationId=${encodeURIComponent(operationId)}`
+      : ""
     return await API.delete({
-      url: `/api/agent/${agentId}/files/${fileId}`,
+      url: `/api/agent/${agentId}/files/${fileId}${query}`,
     })
   },
 
@@ -230,46 +249,75 @@ export const buildAgentEndpoints = (API: BaseAPIClient): AgentEndpoints => ({
 
   fetchAgentKnowledgeSourceAllEntries: async (
     agentId: string,
-    siteId: string
+    siteId: string,
+    operationId?: string
   ) => {
     const query = new URLSearchParams({ siteId })
+    if (operationId) {
+      query.set("operationId", operationId)
+    }
     return await API.get<FetchAgentKnowledgeSourceEntriesResponse>({
       url: `/api/agent/${agentId}/knowledge-sources/sharepoint/entries/all?${query.toString()}`,
     })
   },
 
-  connectAgentSharePointSite: async (agentId: string, body) => {
+  connectAgentSharePointSite: async (agentId: string, body, operationId?: string) => {
+    const query = operationId
+      ? `?operationId=${encodeURIComponent(operationId)}`
+      : ""
     return await API.post<
       ConnectAgentSharePointSiteRequest,
       ConnectAgentSharePointSiteResponse
     >({
-      url: `/api/agent/${agentId}/knowledge-sources/sharepoint/sites`,
+      url: `/api/agent/${agentId}/knowledge-sources/sharepoint/sites${query}`,
       body,
     })
   },
 
-  updateAgentSharePointSite: async (agentId: string, siteId: string, body) => {
+  updateAgentSharePointSite: async (
+    agentId: string,
+    siteId: string,
+    body,
+    operationId?: string
+  ) => {
+    const query = operationId
+      ? `?operationId=${encodeURIComponent(operationId)}`
+      : ""
     return await API.patch<
       UpdateAgentSharePointSiteRequest,
       UpdateAgentSharePointSiteResponse
     >({
-      url: `/api/agent/${agentId}/knowledge-sources/sharepoint/sites/${encodeURIComponent(siteId)}`,
+      url: `/api/agent/${agentId}/knowledge-sources/sharepoint/sites/${encodeURIComponent(siteId)}${query}`,
       body,
     })
   },
 
-  disconnectAgentSharePointSite: async (agentId: string, siteId: string) => {
+  disconnectAgentSharePointSite: async (
+    agentId: string,
+    siteId: string,
+    operationId?: string
+  ) => {
+    const query = operationId
+      ? `?operationId=${encodeURIComponent(operationId)}`
+      : ""
     return await API.delete<void, DisconnectAgentSharePointSiteResponse>({
-      url: `/api/agent/${agentId}/knowledge-sources/sharepoint/sites/${encodeURIComponent(siteId)}`,
+      url: `/api/agent/${agentId}/knowledge-sources/sharepoint/sites/${encodeURIComponent(siteId)}${query}`,
     })
   },
 
-  syncAgentKnowledgeSources: async (agentId: string, sourceId: string) => {
+  syncAgentKnowledgeSources: async (
+    agentId: string,
+    sourceId: string,
+    operationId?: string
+  ) => {
+    const query = operationId
+      ? `?operationId=${encodeURIComponent(operationId)}`
+      : ""
     return await API.post<
       SyncAgentKnowledgeSourcesRequest | undefined,
       SyncAgentKnowledgeSourcesResponse
     >({
-      url: `/api/agent/${agentId}/knowledge-sources/${encodeURIComponent(sourceId)}/sync`,
+      url: `/api/agent/${agentId}/knowledge-sources/${encodeURIComponent(sourceId)}/sync${query}`,
     })
   },
 })
