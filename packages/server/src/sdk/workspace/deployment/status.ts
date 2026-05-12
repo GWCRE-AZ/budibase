@@ -1,6 +1,7 @@
 import { context } from "@budibase/backend-core"
 import {
   Agent,
+  AgentKnowledgeSource,
   Automation,
   KnowledgeBaseFile,
   PublishResourceState,
@@ -56,7 +57,7 @@ export async function status() {
   const normalizeArray = <T>(items: T[]) => [...items].sort()
 
   const toComparableKnowledgeSource = (
-    source: NonNullable<Agent["knowledgeSources"]>[number]
+    source: NonNullable<AgentKnowledgeSource>
   ) => ({
     id: source.id,
     type: source.type,
@@ -91,10 +92,6 @@ export async function status() {
   })
 
   const normalizeAgentPayload = (agent: Agent, files: KnowledgeBaseFile[]) => {
-    const normalizedKnowledgeSources = (agent.knowledgeSources || [])
-      .map(source => toComparableKnowledgeSource(source))
-      .sort((a, b) => a.id.localeCompare(b.id))
-
     const normalizedFiles = files
       .map(file => toComparableKnowledgeBaseFile(file))
       .sort((a, b) => {
@@ -108,10 +105,8 @@ export async function status() {
       icon: agent.icon,
       iconColor: agent.iconColor,
       aiconfig: agent.aiconfig,
-      promptInstructions: agent.promptInstructions,
       goal: agent.goal,
       live: agent.live,
-      enabledTools: normalizeArray(agent.enabledTools || []),
       operations: (agent.operations || [])
         .map(operation => ({
           id: operation.id,
@@ -155,7 +150,6 @@ export async function status() {
             idleTimeoutMinutes: agent.slackIntegration.idleTimeoutMinutes,
           }
         : undefined,
-      knowledgeSources: normalizedKnowledgeSources,
       files: normalizedFiles,
     }
   }

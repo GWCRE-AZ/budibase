@@ -14,6 +14,16 @@ import { v4 } from "uuid"
 const SECRET_MASK = "********"
 const SECRET_ENCODING_PREFIX = "bbai_enc::"
 const NAME_REQUIRED_ERROR = "Agent name is required."
+const DEFAULT_OPERATION_NAME = "Default operation"
+
+type AgentLegacyFields = Partial<{
+  promptInstructions: string
+  enabledTools: string[]
+  knowledgeBases: string[]
+  knowledgeSources: NonNullable<Agent["operations"]>[number]["knowledgeSources"]
+}>
+
+type DeprecatedAgent = Agent & AgentLegacyFields
 
 const guardName = async (name: string, id?: string) => {
   if (!name.trim()) {
@@ -103,12 +113,70 @@ const decodeSlackIntegrationSecrets = (
   }
 }
 
-const withAgentDefaults = (agent: Agent): Agent => ({
+const hasLegacyOperationData = (agent: AgentLegacyFields) =>
+  !!agent.promptInstructions ||
+  !!agent.enabledTools?.length ||
+  !!agent.knowledgeBases?.length ||
+  !!agent.knowledgeSources?.length
+
+const normalizeOperation = (
+  operation: NonNullable<Agent["operations"]>[number],
+  fallbackId?: string
+): NonNullable<Agent["operations"]>[number] => ({
+  ...operation,
+  id: operation.id || fallbackId || `operation_${v4()}`,
+  name: operation.name?.trim() || DEFAULT_OPERATION_NAME,
+  enabledTools: operation.enabledTools || [],
+  knowledgeBases: operation.knowledgeBases || [],
+})
+
+const operationFromLegacyFields = (
+  agent: AgentLegacyFields & Pick<Agent, "_id">
+): NonNullable<Agent["operations"]>[number] => {
+  const fallbackId = agent._id
+    ? `operation_${helpers
+        .normalizeForComparison(agent._id)
+        .replace(/[^a-z0-9]/g, "_")}`
+    : `operation_${v4()}`
+
+  return normalizeOperation(
+    {
+      id: fallbackId,
+      name: DEFAULT_OPERATION_NAME,
+      promptInstructions: agent.promptInstructions,
+      enabledTools: agent.enabledTools || [],
+      knowledgeBases: agent.knowledgeBases || [],
+      knowledgeSources: agent.knowledgeSources,
+    },
+    fallbackId
+  )
+}
+
+const normalizeOperations = (
+  agent: Pick<Agent, "_id" | "operations"> & AgentLegacyFields
+) => {
+  if (agent.operations?.length) {
+    return agent.operations.map(operation => normalizeOperation(operation))
+  }
+  if (hasLegacyOperationData(agent)) {
+    return [operationFromLegacyFields(agent)]
+  }
+  return []
+}
+
+const toStorageAgentShape = (agent: DeprecatedAgent): DeprecatedAgent => ({
+  ...agent,
+  operations: normalizeOperations(agent),
+  promptInstructions: undefined,
+  enabledTools: undefined,
+  knowledgeBases: undefined,
+  knowledgeSources: undefined,
+})
+
+const withAgentDefaults = (agent: DeprecatedAgent): Agent => ({
   ...agent,
   live: agent.live ?? false,
-  enabledTools: agent.enabledTools || [],
-  knowledgeBases: agent.knowledgeBases || [],
-  operations: agent.operations || [],
+  operations: normalizeOperations(agent),
   discordIntegration: decodeDiscordIntegrationSecrets(agent.discordIntegration),
   slackIntegration: decodeSlackIntegrationSecrets(agent.slackIntegration),
 })
@@ -201,7 +269,7 @@ const mergeSlackIntegration = ({
 
 export async function fetch(): Promise<Agent[]> {
   const db = context.getWorkspaceDB()
-  const result = await db.allDocs<Agent>(
+  const result = await db.allDocs<DeprecatedAgent>(
     docIds.getDocParams(DocumentType.AGENT, undefined, {
       include_docs: true,
     })
@@ -209,7 +277,7 @@ export async function fetch(): Promise<Agent[]> {
 
   return result.rows
     .map(row => row.doc)
-    .filter((doc): doc is Agent => !!doc)
+    .filter((doc): doc is DeprecatedAgent => !!doc)
     .map(withAgentDefaults)
 }
 
@@ -220,7 +288,7 @@ export async function getOrThrow(agentId: string | undefined): Promise<Agent> {
 
   const db = context.getWorkspaceDB()
 
-  const agent = await db.tryGet<Agent>(agentId)
+  const agent = await db.tryGet<DeprecatedAgent>(agentId)
   if (!agent) {
     throw new HTTPError("Agent not found", 404)
   }
@@ -244,7 +312,6 @@ export async function create(
     name: request.name,
     description: request.description,
     aiconfig: request.aiconfig || "", // this might be set later, it will be validated on publish/usage
-    promptInstructions: request.promptInstructions,
     live: request.live ?? false,
     publishedAt: request.live ? now : undefined,
     icon: request.icon,
@@ -252,24 +319,24 @@ export async function create(
     goal: request.goal,
     createdAt: now,
     createdBy: request.createdBy,
-    enabledTools: request.enabledTools || [],
-    knowledgeBases: request.knowledgeBases || [],
-    knowledgeSources: request.knowledgeSources,
     discordIntegration: request.discordIntegration,
     MSTeamsIntegration: request.MSTeamsIntegration,
     slackIntegration: request.slackIntegration,
     operations: request.operations || [],
   }
 
+  const storageAgent = toStorageAgentShape(agent)
   const { rev } = await db.put({
-    ...agent,
+    ...storageAgent,
     discordIntegration: encodeDiscordIntegrationSecrets(
-      agent.discordIntegration
+      storageAgent.discordIntegration
     ),
-    slackIntegration: encodeSlackIntegrationSecrets(agent.slackIntegration),
+    slackIntegration: encodeSlackIntegrationSecrets(
+      storageAgent.slackIntegration
+    ),
   })
-  agent._rev = rev
-  const result = withAgentDefaults(agent)
+  storageAgent._rev = rev
+  const result = withAgentDefaults(storageAgent)
   events.ai.agentCreated(result)
   return result
 }
@@ -288,15 +355,12 @@ export async function duplicate(
     name,
     description: source.description,
     aiconfig: source.aiconfig,
-    promptInstructions: source.promptInstructions,
     goal: source.goal,
     icon: source.icon,
     iconColor: source.iconColor,
     live: source.live,
     _deleted: false,
     createdBy,
-    enabledTools: source.enabledTools || [],
-    knowledgeBases: source.knowledgeBases || [],
     operations: (source.operations || []).map(operation => ({
       ...operation,
       id: `operation_${v4()}`,
@@ -311,7 +375,7 @@ export async function update(agent: Agent): Promise<Agent> {
   }
 
   const db = context.getWorkspaceDB()
-  const existingRaw = await db.tryGet<Agent>(_id)
+  const existingRaw = await db.tryGet<DeprecatedAgent>(_id)
   const existing = existingRaw ? withAgentDefaults(existingRaw) : undefined
   if (!existing) {
     throw new HTTPError("Agent not found", 404)
@@ -326,13 +390,11 @@ export async function update(agent: Agent): Promise<Agent> {
   }
 
   const now = new Date().toISOString()
-  const updated: Agent = {
+  const updated: DeprecatedAgent = {
     ...existing,
     ...agent,
     updatedAt: now,
-    enabledTools: agent.enabledTools ?? existing?.enabledTools ?? [],
-    knowledgeBases: agent.knowledgeBases ?? existing?.knowledgeBases ?? [],
-    operations: agent.operations ?? existing?.operations ?? [],
+    operations: agent.operations ?? existing?.operations,
     discordIntegration: mergeDiscordIntegration({
       existing: existing?.discordIntegration,
       incoming: agent.discordIntegration,
@@ -353,15 +415,18 @@ export async function update(agent: Agent): Promise<Agent> {
     ? existing?.publishedAt || now
     : undefined
 
+  const storageAgent = toStorageAgentShape(updated)
   const { rev } = await db.put({
-    ...updated,
+    ...storageAgent,
     discordIntegration: encodeDiscordIntegrationSecrets(
-      updated.discordIntegration
+      storageAgent.discordIntegration
     ),
-    slackIntegration: encodeSlackIntegrationSecrets(updated.slackIntegration),
+    slackIntegration: encodeSlackIntegrationSecrets(
+      storageAgent.slackIntegration
+    ),
   })
-  updated._rev = rev
-  const result = withAgentDefaults(updated)
+  storageAgent._rev = rev
+  const result = withAgentDefaults(storageAgent)
   events.ai.agentUpdated(result)
   return result
 }
@@ -370,8 +435,9 @@ export async function remove(agentId: string) {
   const db = context.getWorkspaceDB()
   const agent = await getOrThrow(agentId)
 
-  if (agent.knowledgeBases) {
-    for (const knowledgeBaseId of agent.knowledgeBases) {
+  const primaryOperation = agent.operations?.[0]
+  if (primaryOperation?.knowledgeBases) {
+    for (const knowledgeBaseId of primaryOperation.knowledgeBases) {
       const knowledgeBase = await knowledgeBaseSdk.find(knowledgeBaseId)
       if (!knowledgeBase) {
         continue

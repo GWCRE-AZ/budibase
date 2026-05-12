@@ -84,19 +84,15 @@ export interface Agent extends Document {
   name: string
   description?: string
   aiconfig: string
-  promptInstructions?: string
   goal?: string
   live?: boolean
   publishedAt?: string
   icon?: string
   iconColor?: string
   createdBy?: string
-  enabledTools?: string[]
-  knowledgeBases?: string[]
   discordIntegration?: DiscordAgentIntegration
   MSTeamsIntegration?: MSTeamsAgentIntegration
   slackIntegration?: SlackAgentIntegration
-  knowledgeSources?: AgentKnowledgeSource[]
   operations?: AgentOperation[]
 }
 

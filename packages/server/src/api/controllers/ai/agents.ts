@@ -54,12 +54,17 @@ const obfuscateAgentSecrets = (agent: Agent): Agent => ({
 })
 
 const withoutKnowledgeConfig = <T extends Agent>(agent: T) => {
-  const {
-    knowledgeSources: _knowledgeSources,
-    knowledgeBases: _knowledgeBases,
-    ...rest
-  } = agent
-  return rest
+  return {
+    ...agent,
+    operations: (agent.operations || []).map(operation => {
+      const {
+        knowledgeSources: _knowledgeSources,
+        knowledgeBases: _knowledgeBases,
+        ...rest
+      } = operation
+      return rest
+    }),
+  }
 }
 
 const stableSerialize = (value: unknown): string => {
@@ -284,20 +289,16 @@ export async function createAgent(
     name: body.name,
     description: body.description,
     aiconfig: body.aiconfig,
-    promptInstructions: body.promptInstructions,
     goal: body.goal,
     icon: body.icon,
     iconColor: body.iconColor,
     live: body.live,
     _deleted: false,
     createdBy: globalId,
-    enabledTools: body.enabledTools,
     discordIntegration: body.discordIntegration,
     MSTeamsIntegration: body.MSTeamsIntegration,
     slackIntegration: body.slackIntegration,
     operations: body.operations,
-    knowledgeSources: undefined,
-    knowledgeBases: undefined,
   }
 
   const agent = await sdk.ai.agents.create(createRequest)
@@ -315,7 +316,9 @@ export async function updateAgent(
 
   if (Object.prototype.hasOwnProperty.call(rawBody, "knowledgeSources")) {
     const incoming = normalizeKnowledgeSources(rawBody.knowledgeSources)
-    const current = normalizeKnowledgeSources(existing.knowledgeSources || [])
+    const current = normalizeKnowledgeSources(
+      existing.operations?.[0]?.knowledgeSources || []
+    )
     if (stableSerialize(incoming) !== stableSerialize(current)) {
       throw new HTTPError(
         "knowledgeSources cannot be updated from this endpoint",
@@ -326,7 +329,9 @@ export async function updateAgent(
 
   if (Object.prototype.hasOwnProperty.call(rawBody, "knowledgeBases")) {
     const incoming = normalizeKnowledgeBases(rawBody.knowledgeBases)
-    const current = normalizeKnowledgeBases(existing.knowledgeBases || [])
+    const current = normalizeKnowledgeBases(
+      existing.operations?.[0]?.knowledgeBases || []
+    )
     if (stableSerialize(incoming) !== stableSerialize(current)) {
       throw new HTTPError(
         "knowledgeBases cannot be updated from this endpoint",
@@ -341,13 +346,11 @@ export async function updateAgent(
     name: body.name,
     description: body.description,
     aiconfig: body.aiconfig,
-    promptInstructions: body.promptInstructions,
     goal: body.goal,
     icon: body.icon,
     iconColor: body.iconColor,
     live: body.live,
     publishedAt: undefined,
-    enabledTools: body.enabledTools,
     operations: body.operations,
     discordIntegration: body.discordIntegration,
     MSTeamsIntegration: body.MSTeamsIntegration,

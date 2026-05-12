@@ -152,10 +152,12 @@ export async function buildPromptAndTools(
   if (!agentId) {
     throw new Error("Agent _id is required")
   }
-  const hasKnowledgeBases = agent.knowledgeBases?.some(Boolean) ?? false
+  const primaryOperation = agent.operations?.[0]
+  const hasKnowledgeBases =
+    primaryOperation?.knowledgeBases?.some(Boolean) ?? false
 
   const allTools = await getAvailableTools(agent.aiconfig)
-  const enabledToolNames = new Set(agent.enabledTools || [])
+  const enabledToolNames = new Set(primaryOperation?.enabledTools || [])
   const enabledTools = addHelperTools(
     allTools.filter(
       tool => enabledToolNames.has(tool.name) && !isHelperTool(tool)
@@ -179,7 +181,7 @@ export async function buildPromptAndTools(
   const systemPrompt = ai.composeAutomationAgentSystemPrompt({
     baseSystemPrompt,
     goal: includeGoal ? agent.goal : undefined,
-    promptInstructions: agent.promptInstructions,
+    promptInstructions: primaryOperation?.promptInstructions,
     includeGoal,
   })
 

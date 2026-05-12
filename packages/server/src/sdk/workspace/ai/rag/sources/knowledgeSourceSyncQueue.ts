@@ -64,7 +64,7 @@ const getJobId = (job: KnowledgeSourceSyncJob) =>
   `${getAgentJobPrefix(job.workspaceId, job.agentId)}${job.sourceType}_${job.sourceId}`
 
 const getAgentSharePointSources = (agent: Agent) =>
-  (agent.knowledgeSources || []).filter(
+  (agent.operations?.[0]?.knowledgeSources || []).filter(
     source => source.type === AgentKnowledgeSourceType.SHAREPOINT
   )
 
@@ -426,7 +426,7 @@ export async function rehydrateScheduledJobs() {
       ).length
 
       const reconcileTargets = agents.filter(agent =>
-        (agent.knowledgeSources || []).some(
+        (agent.operations?.[0]?.knowledgeSources || []).some(
           source => source.type === AgentKnowledgeSourceType.SHAREPOINT
         )
       )

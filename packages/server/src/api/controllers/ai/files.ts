@@ -293,15 +293,24 @@ export async function connectAgentSharePointSite(
     siteId,
     sourceId: nextSource.id,
   })
-  const nonSharePointSources = (existingAgent.knowledgeSources || []).filter(
+  const currentOperation = existingAgent.operations?.[0] || {
+    id: `operation_${existingAgent._id}`,
+    name: "Default operation",
+  }
+  const nonSharePointSources = (currentOperation.knowledgeSources || []).filter(
     source => source.type !== AgentKnowledgeSourceType.SHAREPOINT
   )
   const updated = await sdk.ai.agents.update({
     ...existingAgent,
-    knowledgeSources: [
-      ...nonSharePointSources,
-      ...getSharePointSources(existingAgent),
-      nextSource,
+    operations: [
+      {
+        ...currentOperation,
+        knowledgeSources: [
+          ...nonSharePointSources,
+          ...getSharePointSources(existingAgent),
+          nextSource,
+        ],
+      },
     ],
   })
   await sdk.ai.rag.knowledgeSourceSyncQueue.reconcileAgentJobs(updated)
@@ -346,12 +355,21 @@ export async function updateAgentSharePointSite(
           }
         : existingSource
   )
-  const nonSharePointSources = (existingAgent.knowledgeSources || []).filter(
+  const currentOperation = existingAgent.operations?.[0] || {
+    id: `operation_${existingAgent._id}`,
+    name: "Default operation",
+  }
+  const nonSharePointSources = (currentOperation.knowledgeSources || []).filter(
     source => source.type !== AgentKnowledgeSourceType.SHAREPOINT
   )
   const updated = await sdk.ai.agents.update({
     ...existingAgent,
-    knowledgeSources: [...nonSharePointSources, ...nextSharePointSources],
+    operations: [
+      {
+        ...currentOperation,
+        knowledgeSources: [...nonSharePointSources, ...nextSharePointSources],
+      },
+    ],
   })
   await sdk.ai.rag.knowledgeSourceSyncQueue.reconcileAgentJobs(updated)
   await sdk.ai.rag.knowledgeSourceSyncQueue.enqueueAgentJobs(
@@ -384,12 +402,21 @@ export async function disconnectAgentSharePointSite(
   const nextSharePointSources = getSharePointSources(existingAgent).filter(
     source => source.id !== removedSource.id
   )
-  const nonSharePointSources = (existingAgent.knowledgeSources || []).filter(
+  const currentOperation = existingAgent.operations?.[0] || {
+    id: `operation_${existingAgent._id}`,
+    name: "Default operation",
+  }
+  const nonSharePointSources = (currentOperation.knowledgeSources || []).filter(
     source => source.type !== AgentKnowledgeSourceType.SHAREPOINT
   )
   const updated = await sdk.ai.agents.update({
     ...existingAgent,
-    knowledgeSources: [...nonSharePointSources, ...nextSharePointSources],
+    operations: [
+      {
+        ...currentOperation,
+        knowledgeSources: [...nonSharePointSources, ...nextSharePointSources],
+      },
+    ],
   })
   await sdk.ai.rag.knowledgeSourceSyncQueue.reconcileAgentJobs(updated)
   await sdk.ai.rag.knowledgeSourceSyncQueue.enqueueDisconnectSharePointSiteJob(

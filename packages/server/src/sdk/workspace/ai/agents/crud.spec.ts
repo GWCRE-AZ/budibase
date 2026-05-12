@@ -206,6 +206,35 @@ describe("agents crud", () => {
         expect.objectContaining({ name: "New Agent" })
       )
     })
+
+    it("normalizes legacy top-level fields into operations for storage", async () => {
+      mockDbPut.mockResolvedValue({ rev: "1-new" })
+      mockDbTryGet.mockResolvedValue(undefined)
+
+      await agentsCrud.create({
+        name: "Legacy Agent",
+        aiconfig: "cfg_1",
+        promptInstructions: "Legacy instructions",
+        enabledTools: ["tool_a"],
+        knowledgeBases: ["kb_1"],
+      })
+
+      expect(mockDbPut).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operations: [
+            expect.objectContaining({
+              name: "Default operation",
+              promptInstructions: "Legacy instructions",
+              enabledTools: ["tool_a"],
+              knowledgeBases: ["kb_1"],
+            }),
+          ],
+          promptInstructions: undefined,
+          enabledTools: undefined,
+          knowledgeBases: undefined,
+        })
+      )
+    })
   })
 
   describe("update", () => {
@@ -229,6 +258,42 @@ describe("agents crud", () => {
 
       expect(mockAgentUpdated).toHaveBeenCalledWith(
         expect.objectContaining({ _id: "agent_upd", name: "Updated Name" })
+      )
+    })
+
+    it("auto-migrates legacy agents to operations on update", async () => {
+      const existing = {
+        _id: "agent_legacy",
+        _rev: "1-abc",
+        name: "Legacy",
+        aiconfig: "cfg_1",
+        promptInstructions: "Legacy prompt",
+        enabledTools: ["legacy_tool"],
+        knowledgeBases: ["kb_legacy"],
+      } as Agent
+
+      mockDbTryGet.mockResolvedValue(existing)
+      mockDbPut.mockResolvedValue({ rev: "2-abc" })
+
+      await agentsCrud.update({
+        ...existing,
+        description: "updated",
+      })
+
+      expect(mockDbPut).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operations: [
+            expect.objectContaining({
+              name: "Default operation",
+              promptInstructions: "Legacy prompt",
+              enabledTools: ["legacy_tool"],
+              knowledgeBases: ["kb_legacy"],
+            }),
+          ],
+          promptInstructions: undefined,
+          enabledTools: undefined,
+          knowledgeBases: undefined,
+        })
       )
     })
   })

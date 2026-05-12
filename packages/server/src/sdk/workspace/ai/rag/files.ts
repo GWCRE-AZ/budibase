@@ -16,7 +16,9 @@ import { GeminiRagProcessor } from "./processors/gemini"
 const resolveKnowledgeBasesForAgent = async (
   agent: Agent
 ): Promise<KnowledgeBase[]> => {
-  const knowledgeBaseIds = (agent.knowledgeBases || []).filter(Boolean)
+  const knowledgeBaseIds = (agent.operations?.[0]?.knowledgeBases || []).filter(
+    Boolean
+  )
   if (knowledgeBaseIds.length === 0) {
     return []
   }
@@ -90,7 +92,9 @@ export const ensureKnowledgeBaseForAgent = async (
     },
     async () => {
       const agent = await agentsSdk.getOrThrow(agentId)
-      const existing = await getAgentKnowledgeBase(agent.knowledgeBases)
+      const existing = await getAgentKnowledgeBase(
+        agent.operations?.[0]?.knowledgeBases
+      )
       if (existing) {
         return existing
       }
@@ -102,7 +106,15 @@ export const ensureKnowledgeBaseForAgent = async (
 
       await agentsSdk.update({
         ...agent,
-        knowledgeBases: created._id ? [created._id] : [],
+        operations: [
+          {
+            ...(agent.operations?.[0] || {
+              id: `operation_${agent._id}`,
+              name: "Default operation",
+            }),
+            knowledgeBases: created._id ? [created._id] : [],
+          },
+        ],
       })
 
       return created
@@ -116,7 +128,7 @@ const getKnowledgeBaseIdsForAgent = async (
   agentId: string
 ): Promise<string[]> => {
   const agent = await agentsSdk.getOrThrow(agentId)
-  return (agent.knowledgeBases || []).filter(Boolean)
+  return (agent.operations?.[0]?.knowledgeBases || []).filter(Boolean)
 }
 
 export const listFilesForAgent = async (

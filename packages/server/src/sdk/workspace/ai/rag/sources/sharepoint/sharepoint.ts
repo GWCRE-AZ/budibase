@@ -47,7 +47,7 @@ export const getSharePointFileDedupKey = ({
 }) => `${siteId}:${driveId}:${itemId}`
 
 const getSharePointSources = (agent: Agent): AgentKnowledgeSource[] => {
-  return (agent.knowledgeSources || []).filter(
+  return (agent.operations?.[0]?.knowledgeSources || []).filter(
     source => source.type === AgentKnowledgeSourceType.SHAREPOINT
   )
 }
@@ -332,11 +332,13 @@ const runSharePointSourcesForAgent = async (
     throw new HTTPError("SharePoint is not connected for this agent", 400)
   }
 
-  const site = agent.knowledgeSources?.find(s => s.id === sourceId)?.config.site
-  const sourceDatasourceId = agent.knowledgeSources?.find(
+  const site = agent.operations?.[0]?.knowledgeSources?.find(
+    s => s.id === sourceId
+  )?.config.site
+  const sourceDatasourceId = agent.operations?.[0]?.knowledgeSources?.find(
     s => s.id === sourceId
   )?.config.datasourceId
-  const sourceAuthConfigId = agent.knowledgeSources?.find(
+  const sourceAuthConfigId = agent.operations?.[0]?.knowledgeSources?.find(
     s => s.id === sourceId
   )?.config.authConfigId
   if (!site) {
@@ -347,8 +349,9 @@ const runSharePointSourcesForAgent = async (
   }
 
   const siteId = site.id
-  const sourceFilters = agent.knowledgeSources?.find(s => s.id === sourceId)
-    ?.config.filters
+  const sourceFilters = agent.operations?.[0]?.knowledgeSources?.find(
+    s => s.id === sourceId
+  )?.config.filters
 
   console.log("Starting SharePoint sync for agent", {
     agentId,

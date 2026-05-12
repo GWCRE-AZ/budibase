@@ -63,7 +63,7 @@ export function createAgentValidator() {
       discordIntegration: DISCORD_INTEGRATION_SCHEMA,
       MSTeamsIntegration: TEAMS_INTEGRATION_SCHEMA,
       slackIntegration: SLACK_INTEGRATION_SCHEMA,
-      operations: Joi.array().items(AGENT_OPERATION_SCHEMA).optional(),
+      operations: Joi.array().items(AGENT_OPERATION_SCHEMA).max(1).optional(),
     })
   )
 }
@@ -89,7 +89,7 @@ export function updateAgentValidator() {
       discordIntegration: DISCORD_INTEGRATION_SCHEMA,
       MSTeamsIntegration: TEAMS_INTEGRATION_SCHEMA,
       slackIntegration: SLACK_INTEGRATION_SCHEMA,
-      operations: Joi.array().items(AGENT_OPERATION_SCHEMA).optional(),
+      operations: Joi.array().items(AGENT_OPERATION_SCHEMA).max(1).optional(),
     }).unknown(true)
   )
 }

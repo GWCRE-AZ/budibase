@@ -8,7 +8,7 @@ import {
 import sdk from "../../../sdk"
 
 export const getSharePointSources = (agent?: Agent): AgentKnowledgeSource[] =>
-  (agent?.knowledgeSources || []).filter(
+  (agent?.operations?.[0]?.knowledgeSources || []).filter(
     item => item.type === AgentKnowledgeSourceType.SHAREPOINT
   )
 
