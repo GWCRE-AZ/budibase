@@ -20,7 +20,7 @@ import {
 } from "@budibase/types"
 import sdk from "../../../sdk"
 import { fetchSharePointSitesByDatasourceAuthConfig } from "../../../sdk/workspace/ai/knowledgeSources/sharepoint"
-import { getSharePointSiteIds, getSharePointSources } from "./sharepoint"
+import { getSharePointSiteIds } from "./sharepoint"
 
 const GEMINI_UPSTREAM_EVENT = "ai.gemini.upstream_unavailable"
 
@@ -48,6 +48,15 @@ const unlinkSafe = async (path?: string) => {
 const sanitizeSharePointSourceId = (siteId: string) =>
   `sharepoint_site_${siteId.replace(/[^a-zA-Z0-9_-]/g, "_")}`
 
+const getOperationForKnowledge = (
+  agent: Awaited<ReturnType<typeof sdk.ai.agents.getOrThrow>>,
+  operationId?: string
+) =>
+  operationId
+    ? agent.operations?.find(operation => operation.id === operationId) ||
+      agent.operations?.[0]
+    : agent.operations?.[0]
+
 const fetchSharePointOptionsForDatasourceAuthConfig = async (
   datasourceId: string,
   authConfigId: string
@@ -63,13 +72,18 @@ export async function fetchAgentKnowledge(
   ctx: UserCtx<void, FetchAgentKnowledgeResponse, { agentId: string }>
 ) {
   const { agentId } = ctx.params
+  const operationId = String(ctx.query.operationId || "").trim() || undefined
   const [files, agent, syncState] = await Promise.all([
-    sdk.ai.rag.listFilesForAgent(agentId),
+    sdk.ai.rag.listFilesForAgent(agentId, operationId),
     sdk.ai.agents.getOrThrow(agentId),
     sdk.ai.rag.fetchKnowledgeSourceSyncStateForAgent(agentId),
   ])
+  const operation = getOperationForKnowledge(agent, operationId)
+  const sharePointKnowledgeSources = (operation?.knowledgeSources || []).filter(
+    source => source.type === AgentKnowledgeSourceType.SHAREPOINT
+  )
   const runsBySourceId = new Map(syncState.runs.map(run => [run.sourceId, run]))
-  const sharePointSources = getSharePointSources(agent)
+  const sharePointSources = sharePointKnowledgeSources
     .filter(source => source.config.site.id)
     .map<SharePointKnowledgeSourceSnapshot>(source => {
       const site = source.config.site
@@ -113,6 +127,7 @@ export async function uploadAgentFile(
   ctx: UserCtx<void, AgentFileUploadResponse, { agentId: string }>
 ) {
   const { agentId } = ctx.params
+  const operationId = String(ctx.query.operationId || "").trim() || undefined
   const upload = normalizeUpload(
     ctx.request.files?.file ||
       ctx.request.files?.knowledgeBaseFile ||
@@ -141,13 +156,17 @@ export async function uploadAgentFile(
   const buffer = await readFile(filePath)
 
   try {
-    const updated = await sdk.ai.rag.uploadFileForAgent(agentId, {
-      filename,
-      mimetype,
-      size: fileSize ?? buffer.byteLength,
-      buffer,
-      uploadedBy: ctx.user?._id!,
-    })
+    const updated = await sdk.ai.rag.uploadFileForAgent(
+      agentId,
+      {
+        filename,
+        mimetype,
+        size: fileSize ?? buffer.byteLength,
+        buffer,
+        uploadedBy: ctx.user?._id!,
+      },
+      operationId
+    )
     ctx.body = { file: updated }
     ctx.status = 201
   } catch (error: any) {
@@ -182,7 +201,8 @@ export async function deleteAgentFile(
   ctx: UserCtx<void, { deleted: true }, { agentId: string; fileId: string }>
 ) {
   const { agentId, fileId } = ctx.params
-  await sdk.ai.rag.deleteFileForAgent(agentId, fileId)
+  const operationId = String(ctx.query.operationId || "").trim() || undefined
+  await sdk.ai.rag.deleteFileForAgent(agentId, fileId, operationId)
   ctx.body = { deleted: true }
   ctx.status = 200
 }
@@ -252,12 +272,20 @@ export async function connectAgentSharePointSite(
   >
 ) {
   const { agentId } = ctx.params
+  const operationId = String(ctx.query.operationId || "").trim() || undefined
   const { datasourceId, authConfigId, siteId, filters } = ctx.request.body
   if (!siteId) {
     throw new HTTPError("siteId is required", 400)
   }
 
   const existingAgent = await sdk.ai.agents.getOrThrow(agentId)
+  const targetOperation = getOperationForKnowledge(
+    existingAgent,
+    operationId
+  ) || {
+    id: operationId || `operation_${existingAgent._id}`,
+    name: "Default operation",
+  }
   const existingSites = getSharePointSiteIds(existingAgent)
   if (existingSites.has(siteId)) {
     ctx.body = await fetchSharePointOptionsForDatasourceAuthConfig(
@@ -293,23 +321,15 @@ export async function connectAgentSharePointSite(
     siteId,
     sourceId: nextSource.id,
   })
-  const currentOperation = existingAgent.operations?.[0] || {
-    id: `operation_${existingAgent._id}`,
-    name: "Default operation",
-  }
-  const nonSharePointSources = (currentOperation.knowledgeSources || []).filter(
+  const nonSharePointSources = (targetOperation.knowledgeSources || []).filter(
     source => source.type !== AgentKnowledgeSourceType.SHAREPOINT
   )
   const updated = await sdk.ai.agents.update({
     ...existingAgent,
     operations: [
       {
-        ...currentOperation,
-        knowledgeSources: [
-          ...nonSharePointSources,
-          ...getSharePointSources(existingAgent),
-          nextSource,
-        ],
+        ...targetOperation,
+        knowledgeSources: [...nonSharePointSources, nextSource],
       },
     ],
   })
@@ -334,8 +354,13 @@ export async function updateAgentSharePointSite(
   >
 ) {
   const { agentId, siteId } = ctx.params
+  const operationId = String(ctx.query.operationId || "").trim() || undefined
   const existingAgent = await sdk.ai.agents.getOrThrow(agentId)
-  const source = getSharePointSources(existingAgent).find(
+  const targetOperation = getOperationForKnowledge(existingAgent, operationId)
+  const operationSources = (targetOperation?.knowledgeSources || []).filter(
+    source => source.type === AgentKnowledgeSourceType.SHAREPOINT
+  )
+  const source = operationSources.find(
     source => source.config.site.id === siteId
   )
   if (!source) {
@@ -343,19 +368,18 @@ export async function updateAgentSharePointSite(
   }
 
   const { filters } = ctx.request.body
-  const nextSharePointSources = getSharePointSources(existingAgent).map(
-    existingSource =>
-      existingSource.id === source.id
-        ? {
-            ...existingSource,
-            config: {
-              ...existingSource.config,
-              filters: filters ? { patterns: filters } : undefined,
-            },
-          }
-        : existingSource
+  const nextSharePointSources = operationSources.map(existingSource =>
+    existingSource.id === source.id
+      ? {
+          ...existingSource,
+          config: {
+            ...existingSource.config,
+            filters: filters ? { patterns: filters } : undefined,
+          },
+        }
+      : existingSource
   )
-  const currentOperation = existingAgent.operations?.[0] || {
+  const currentOperation = targetOperation || {
     id: `operation_${existingAgent._id}`,
     name: "Default operation",
   }
@@ -392,17 +416,22 @@ export async function disconnectAgentSharePointSite(
   >
 ) {
   const { agentId, siteId } = ctx.params
+  const operationId = String(ctx.query.operationId || "").trim() || undefined
   const existingAgent = await sdk.ai.agents.getOrThrow(agentId)
-  const removedSource = getSharePointSources(existingAgent).find(
+  const targetOperation = getOperationForKnowledge(existingAgent, operationId)
+  const operationSources = (targetOperation?.knowledgeSources || []).filter(
+    source => source.type === AgentKnowledgeSourceType.SHAREPOINT
+  )
+  const removedSource = operationSources.find(
     source => source.config.site.id === siteId
   )
   if (!removedSource) {
     throw new HTTPError("SharePoint site is not connected for this agent", 404)
   }
-  const nextSharePointSources = getSharePointSources(existingAgent).filter(
+  const nextSharePointSources = operationSources.filter(
     source => source.id !== removedSource.id
   )
-  const currentOperation = existingAgent.operations?.[0] || {
+  const currentOperation = targetOperation || {
     id: `operation_${existingAgent._id}`,
     name: "Default operation",
   }

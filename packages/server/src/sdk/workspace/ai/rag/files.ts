@@ -14,11 +14,14 @@ import { RetrievedContextChunk } from "./processors"
 import { GeminiRagProcessor } from "./processors/gemini"
 
 const resolveKnowledgeBasesForAgent = async (
-  agent: Agent
+  agent: Agent,
+  operationId?: string
 ): Promise<KnowledgeBase[]> => {
-  const knowledgeBaseIds = (agent.operations?.[0]?.knowledgeBases || []).filter(
-    Boolean
-  )
+  const operation = operationId
+    ? agent.operations?.find(op => op.id === operationId) ||
+      agent.operations?.[0]
+    : agent.operations?.[0]
+  const knowledgeBaseIds = (operation?.knowledgeBases || []).filter(Boolean)
   if (knowledgeBaseIds.length === 0) {
     return []
   }
@@ -82,7 +85,8 @@ const getReadySourceIdByFilename = (readyFiles: KnowledgeBaseFile[]) => {
 }
 
 export const ensureKnowledgeBaseForAgent = async (
-  agentId: string
+  agentId: string,
+  operationId?: string
 ): Promise<KnowledgeBase> => {
   const { result } = await locks.doWithLock(
     {
@@ -92,8 +96,12 @@ export const ensureKnowledgeBaseForAgent = async (
     },
     async () => {
       const agent = await agentsSdk.getOrThrow(agentId)
+      const existingOperation = operationId
+        ? agent.operations?.find(op => op.id === operationId) ||
+          agent.operations?.[0]
+        : agent.operations?.[0]
       const existing = await getAgentKnowledgeBase(
-        agent.operations?.[0]?.knowledgeBases
+        existingOperation?.knowledgeBases
       )
       if (existing) {
         return existing
@@ -104,14 +112,15 @@ export const ensureKnowledgeBaseForAgent = async (
         type: KnowledgeBaseType.GEMINI,
       })
 
+      const targetOperation = existingOperation || {
+        id: operationId || `operation_${agent._id}`,
+        name: "Default operation",
+      }
       await agentsSdk.update({
         ...agent,
         operations: [
           {
-            ...(agent.operations?.[0] || {
-              id: `operation_${agent._id}`,
-              name: "Default operation",
-            }),
+            ...targetOperation,
             knowledgeBases: created._id ? [created._id] : [],
           },
         ],
@@ -125,16 +134,25 @@ export const ensureKnowledgeBaseForAgent = async (
 }
 
 const getKnowledgeBaseIdsForAgent = async (
-  agentId: string
+  agentId: string,
+  operationId?: string
 ): Promise<string[]> => {
   const agent = await agentsSdk.getOrThrow(agentId)
-  return (agent.operations?.[0]?.knowledgeBases || []).filter(Boolean)
+  const operation = operationId
+    ? agent.operations?.find(op => op.id === operationId) ||
+      agent.operations?.[0]
+    : agent.operations?.[0]
+  return (operation?.knowledgeBases || []).filter(Boolean)
 }
 
 export const listFilesForAgent = async (
-  agentId: string
+  agentId: string,
+  operationId?: string
 ): Promise<KnowledgeBaseFile[]> => {
-  const knowledgeBaseIds = await getKnowledgeBaseIdsForAgent(agentId)
+  const knowledgeBaseIds = await getKnowledgeBaseIdsForAgent(
+    agentId,
+    operationId
+  )
   if (knowledgeBaseIds.length === 0) {
     return []
   }
@@ -156,9 +174,10 @@ interface UploadFileForAgentInput {
 
 export const uploadFileForAgent = async (
   agentId: string,
-  input: UploadFileForAgentInput
+  input: UploadFileForAgentInput,
+  operationId?: string
 ): Promise<KnowledgeBaseFile> => {
-  const knowledgeBase = await ensureKnowledgeBaseForAgent(agentId)
+  const knowledgeBase = await ensureKnowledgeBaseForAgent(agentId, operationId)
   const knowledgeBaseId = knowledgeBase._id
   if (!knowledgeBaseId) {
     throw new HTTPError("Failed to create agent file storage", 500)
@@ -176,14 +195,18 @@ export const uploadFileForAgent = async (
 
 export const deleteFileForAgent = async (
   agentId: string,
-  fileId: string
+  fileId: string,
+  operationId?: string
 ): Promise<void> => {
   const file = await knowledgeBaseSdk.getKnowledgeBaseFileOrThrow(fileId)
   const fileKnowledgeBaseId = file.knowledgeBaseId
   if (!fileKnowledgeBaseId) {
     throw new HTTPError("Invalid knowledge base file id", 400)
   }
-  const knowledgeBaseIds = await getKnowledgeBaseIdsForAgent(agentId)
+  const knowledgeBaseIds = await getKnowledgeBaseIdsForAgent(
+    agentId,
+    operationId
+  )
   if (!knowledgeBaseIds.includes(fileKnowledgeBaseId)) {
     throw new HTTPError("File does not belong to this agent", 404)
   }
@@ -230,13 +253,14 @@ interface RetrievedContextResult {
 
 export const retrieveContextForAgent = async (
   agent: Agent,
-  question: string
+  question: string,
+  operationId?: string
 ): Promise<RetrievedContextResult> => {
   if (!question || question.trim().length === 0) {
     return { text: "", chunks: [], sources: [] }
   }
 
-  const knowledgeBases = await resolveKnowledgeBasesForAgent(agent)
+  const knowledgeBases = await resolveKnowledgeBasesForAgent(agent, operationId)
   const chunks: Array<RetrievedContextChunk> = []
   const files: KnowledgeBaseFile[] = []
 
