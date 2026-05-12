@@ -143,6 +143,7 @@ const operationFromLegacyFields = (
     {
       id: fallbackId,
       name: DEFAULT_OPERATION_NAME,
+      live: true,
       promptInstructions: agent.promptInstructions,
       enabledTools: agent.enabledTools || [],
       knowledgeBases: agent.knowledgeBases || [],
