@@ -99,23 +99,32 @@
       ? data.block.stepId === AutomationActionStepId.LOOP_V2
       : false
   $: isSubflowEdge = data.isSubflowEdge === true
+  $: isEmptyBranchAnchor =
+    isAnchorTarget && block ? isBranchContext(block) : false
 
   $: if (isAnchorTarget || isLoopTarget || isLoopSource) {
-    labelX = Math.round(((sourceX ?? 0) + (targetX ?? 0)) / 2)
-    labelY = isLoopSource ? (targetY ?? 0) : (sourceY ?? 0)
+    labelX = isEmptyBranchAnchor
+      ? (targetX ?? 0)
+      : Math.round(((sourceX ?? 0) + (targetX ?? 0)) / 2)
+    labelY = isEmptyBranchAnchor
+      ? (targetY ?? 0)
+      : isLoopSource
+        ? (targetY ?? 0)
+        : (sourceY ?? 0)
   }
 
   $: loopTargetPath = isLoopTarget ? getLoopTargetPath() : undefined
   $: loopSourcePath = isLoopSource ? getLoopSourcePath() : undefined
 
-  $: edgePath = isAnchorTarget
-    ? getStraightPath({
-        sourceX,
-        sourceY,
-        targetX: labelX,
-        targetY: labelY,
-      })[0]
-    : loopTargetPath || loopSourcePath || basePath[0]
+  $: edgePath =
+    isAnchorTarget && !isEmptyBranchAnchor
+      ? getStraightPath({
+          sourceX,
+          sourceY,
+          targetX: labelX,
+          targetY: labelY,
+        })[0]
+      : loopTargetPath || loopSourcePath || basePath[0]
 
   $: blockId = resolveBlockId(data?.block as FlowBlockContext | undefined)
   $: blockRef = blockId ? $selectedAutomation?.blockRefs?.[blockId] : undefined
