@@ -70,6 +70,15 @@ export interface AgentSharePointKnowledgeSource {
 
 export type AgentKnowledgeSource = AgentSharePointKnowledgeSource
 
+export interface AgentOperation {
+  id: string
+  name: string
+  promptInstructions?: string
+  enabledTools?: string[]
+  knowledgeBases?: string[]
+  knowledgeSources?: AgentKnowledgeSource[]
+}
+
 export interface Agent extends Document {
   name: string
   description?: string
@@ -87,6 +96,7 @@ export interface Agent extends Document {
   MSTeamsIntegration?: MSTeamsAgentIntegration
   slackIntegration?: SlackAgentIntegration
   knowledgeSources?: AgentKnowledgeSource[]
+  operations?: AgentOperation[]
 }
 
 export interface AgentMessageRagSource {
