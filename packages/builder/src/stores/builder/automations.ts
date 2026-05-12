@@ -1839,7 +1839,10 @@ const automationActions = (store: AutomationStore) => ({
 
     const newBranch = store.actions.generateBranchBlock()
 
-    newBranch.inputs.branches = [createBranch("Condition 1")]
+    newBranch.inputs.branches = [
+      createBranch("Condition 1"),
+      createBranch("Condition 2"),
+    ]
 
     // Init the branch children. Shift all steps following the new branch step
     // into the 0th branch.
@@ -1983,7 +1986,7 @@ const automationActions = (store: AutomationStore) => ({
     }
 
     const branches = branchStep.inputs.branches || []
-    if (branches.length <= 1 || !branches[branchIdx]) {
+    if (branches.length <= 2 || !branches[branchIdx]) {
       return
     }
 
