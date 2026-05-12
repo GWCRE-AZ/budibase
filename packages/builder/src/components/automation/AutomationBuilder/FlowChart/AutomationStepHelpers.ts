@@ -462,6 +462,7 @@ export const dagreLayoutAutomation = (
   if (compactLoops) {
     applyLoopClearance(graph)
   }
+  alignSwitchBranchTargets(graph)
   return graph
 }
 
