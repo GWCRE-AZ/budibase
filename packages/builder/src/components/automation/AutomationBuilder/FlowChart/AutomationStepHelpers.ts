@@ -37,12 +37,7 @@ import {
   renderBranches,
   renderLoopV2Container,
 } from "./FlowCanvas/FlowGraphBuilder"
-import {
-  ANCHOR,
-  BRANCH,
-  STEP,
-  type FlowLayoutDirection,
-} from "./FlowCanvas/FlowGeometry"
+import { ANCHOR, BRANCH, STEP } from "./FlowCanvas/FlowGeometry"
 import { applyLoopClearance } from "./FlowCanvas/FlowLayout"
 
 const FLOW_ITEM_CARD_HEIGHT = 60
@@ -401,21 +396,19 @@ export interface DagreLayoutOptions {
   ranksep?: number
   nodesep?: number
   compactLoops?: boolean
-  layoutDirection?: FlowLayoutDirection
 }
 
 export const dagreLayoutAutomation = (
   graph: { nodes: FlowNode[]; edges: FlowEdge[] },
   opts?: DagreLayoutOptions
 ) => {
-  const rankdir = opts?.layoutDirection ?? "LR"
   const ranksep = opts?.ranksep ?? 260
   const nodesep = opts?.nodesep ?? 220
   const compactLoops = opts?.compactLoops !== false
 
   const dagreGraph = new dagre.graphlib.Graph()
   dagreGraph.setDefaultEdgeLabel(() => ({}))
-  dagreGraph.setGraph({ rankdir, ranksep, nodesep })
+  dagreGraph.setGraph({ rankdir: "LR", ranksep, nodesep })
 
   const nodeById: Record<string, FlowNode> = {}
   graph.nodes.forEach(n => (nodeById[n.id] = n))
@@ -458,22 +451,15 @@ export const dagreLayoutAutomation = (
       if (!dims) return
       const width = dims.width
       const height = dims.height
-      if (rankdir === "LR") {
-        node.targetPosition = Position.Left
-        node.sourcePosition = Position.Right
-      } else {
-        node.targetPosition = Position.Top
-        node.sourcePosition = Position.Bottom
-      }
+      node.targetPosition = Position.Left
+      node.sourcePosition = Position.Right
       node.position = {
         x: Math.round(dims.x - width / 2),
         y: Math.round(dims.y - height / 2),
       }
     })
 
-  alignSwitchBranchTargets(graph)
-
-  if (compactLoops && rankdir === "LR") {
+  if (compactLoops) {
     applyLoopClearance(graph)
   }
   return graph
