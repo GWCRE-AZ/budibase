@@ -4,7 +4,7 @@
   import type { AgentTool } from "./toolTypes"
   import type { BindingCompletion } from "@/types"
   import * as routify from "@roxi/routify"
-  import { selectedAgent } from "@/stores/portal"
+  import { agentsStore } from "@/stores/portal"
   import OperationSidePanel from "./OperationSidePanel.svelte"
   const { goto } = routify
   $goto
@@ -19,7 +19,7 @@
     webSearchConfigured = false,
     onUpdated,
   }: {
-    agent?: Agent
+    agent: Agent | undefined
     promptBindings?: EnrichedBinding[]
     bindingIcons?: Record<string, string | undefined>
     completions?: BindingCompletion[]
@@ -30,7 +30,7 @@
   } = $props()
 
   let operationPanelOpen = $state(false)
-  let currentAgentId = $derived($selectedAgent?._id)
+  let currentAgentId = $derived(agent?._id)
 
   const openOperationPanel = () => {
     operationPanelOpen = true
@@ -40,9 +40,21 @@
     operationPanelOpen = false
   }
 
-  const handleAddOperation = () => {
-    notifications.info("Only one operation is supported at the moment.")
-    return
+  const handleAddOperation = async () => {
+    if (!currentAgentId) {
+      return
+    }
+    if ((agent?.operations || []).length > 0) {
+      notifications.info("Only one operation is supported at the moment.")
+      return
+    }
+    try {
+      const updated = await agentsStore.createAgentOperation(currentAgentId)
+      agent = updated
+      openOperationPanel()
+    } catch {
+      notifications.error("Failed to create operation")
+    }
   }
 
   const deleteOperation = async () => {
@@ -65,21 +77,25 @@
     </Button>
   </div>
 
-  <div class="operation-list">
-    <button
-      class="operation-row"
-      type="button"
-      onclick={() => openOperationPanel()}
-    >
-      <span class="operation-name">Default operation</span>
+  {#if (agent?.operations || []).length > 0}
+    <div class="operation-list">
+      <button
+        class="operation-row"
+        type="button"
+        onclick={() => openOperationPanel()}
+      >
+        <span class="operation-name"
+          >{agent?.operations?.[0]?.name || "Operation"}</span
+        >
 
-      <Icon
-        name="dots-three"
-        size="S"
-        color="var(--spectrum-global-color-gray-600)"
-      />
-    </button>
-  </div>
+        <Icon
+          name="dots-three"
+          size="S"
+          color="var(--spectrum-global-color-gray-600)"
+        />
+      </button>
+    </div>
+  {/if}
 </div>
 
 <OperationSidePanel

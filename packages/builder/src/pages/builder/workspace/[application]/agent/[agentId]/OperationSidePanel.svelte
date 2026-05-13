@@ -89,9 +89,14 @@
     if (!binding) {
       return
     }
-    const current = agent.promptInstructions || ""
+    const current = agent.operations?.[0]?.promptInstructions || ""
     const insertion = `{{ ${binding} }}`
-    agent.promptInstructions = `${current}${current ? "\n" : ""}${insertion}`
+    const operation = agent.operations?.[0] || {
+      id: "operation_default",
+      name: "Operation",
+    }
+    operation.promptInstructions = `${current}${current ? "\n" : ""}${insertion}`
+    agent.operations = [operation]
     agent.enabledTools = Array.from(
       new Set([...(agent.enabledTools || []), tool.runtimeBinding])
     )
@@ -149,12 +154,17 @@
                 <div class="instructions-actions">
                   <GenerateInstructionsControl
                     triggerLabel="Help write instructions"
-                    promptInstructions={agent?.promptInstructions || ""}
+                    promptInstructions={agent?.operations?.[0]?.promptInstructions || ""}
                     {promptBindings}
                     {bindingIcons}
                     onApplyInstructions={instructions => {
                       if (!agent) return
-                      agent.promptInstructions = instructions
+                      const operation = agent.operations?.[0] || {
+                        id: "operation_default",
+                        name: "Operation",
+                      }
+                      operation.promptInstructions = instructions
+                      agent.operations = [operation]
                       onUpdated()
                     }}
                   />
@@ -166,7 +176,7 @@
                   {#if toolsLoaded}
                     {#key resolvedIconCount}
                       <CodeEditor
-                        value={agent?.promptInstructions || ""}
+                        value={agent?.operations?.[0]?.promptInstructions || ""}
                         bindings={promptBindings}
                         {bindingIcons}
                         {completions}
@@ -177,7 +187,12 @@
                         placeholder=""
                         on:change={event => {
                           if (!agent) return
-                          agent.promptInstructions = event.detail || ""
+                          const operation = agent.operations?.[0] || {
+                            id: "operation_default",
+                            name: "Operation",
+                          }
+                          operation.promptInstructions = event.detail || ""
+                          agent.operations = [operation]
                         }}
                         on:blur={onUpdated}
                         bind:getCaretPosition

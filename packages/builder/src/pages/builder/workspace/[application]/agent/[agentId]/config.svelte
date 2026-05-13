@@ -194,7 +194,8 @@ Any constraints the agent must follow.
         aiconfig: agent.aiconfig || "",
         goal: agent.goal || "",
         promptInstructions:
-          agent.promptInstructions ?? DEFAULT_PROMPT_INSTRUCTIONS,
+          agent.operations?.[0]?.promptInstructions ??
+          DEFAULT_PROMPT_INSTRUCTIONS,
         icon: agent.icon || "",
         iconColor: agent.iconColor || "",
       }
@@ -413,6 +414,15 @@ Any constraints the agent must follow.
       await agentsStore.updateAgent({
         ...currentAgent,
         ...draft,
+        operations: [
+          {
+            ...(currentAgent.operations?.[0] || {
+              id: "operation_default",
+              name: "Operation",
+            }),
+            promptInstructions: draft.promptInstructions,
+          },
+        ],
         enabledTools,
       })
 

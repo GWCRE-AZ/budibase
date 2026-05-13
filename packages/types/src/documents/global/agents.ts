@@ -77,11 +77,17 @@ export interface AgentSharePointKnowledgeSource {
 
 export type AgentKnowledgeSource = AgentSharePointKnowledgeSource
 
+export interface AgentOperation {
+  id: string
+  name: string
+  promptInstructions?: string
+}
+
 export interface Agent extends Document {
   name: string
   description?: string
   aiconfig: string
-  promptInstructions?: string
+  operations?: AgentOperation[]
   goal?: string
   live?: boolean
   publishedAt?: string
