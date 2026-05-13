@@ -1,12 +1,5 @@
 <script lang="ts">
-  import {
-    Body,
-    Button,
-    Icon,
-    Input,
-    Toggle,
-    notifications,
-  } from "@budibase/bbui"
+  import { Body, Button, Input, Toggle, notifications } from "@budibase/bbui"
   import { confirm } from "@/helpers"
   import { agentsStore, knowledgeConnectionsStore } from "@/stores/portal"
   import { bb } from "@/stores/bb"
@@ -534,13 +527,13 @@
   />
   <DisplaySharePointSiteModal
     bind:this={displaySharePointSiteModal}
-    agentId={agentId}
+    {agentId}
     siteId={selectedSharePointSiteId}
     onEdit={openSharePointSiteSelectionModal}
   />
   <SelectSharePointFilesModal
     bind:this={selectSharePointFilesModal}
-    agentId={agentId}
+    {agentId}
     siteId={selectedSharePointSiteId}
   />
 {/if}

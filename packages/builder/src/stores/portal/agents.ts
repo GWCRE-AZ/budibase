@@ -192,8 +192,11 @@ export class AgentsStore extends BudiStore<AgentStoreState> {
       API.uploadAgentFile(agentId, file, operationId)
     )
 
-  deleteAgentFile = async (agentId: string, fileId: string, operationId?: string) =>
-    await API.deleteAgentFile(agentId, fileId, operationId)
+  deleteAgentFile = async (
+    agentId: string,
+    fileId: string,
+    operationId?: string
+  ) => await API.deleteAgentFile(agentId, fileId, operationId)
 
   fetchAgentKnowledgeSourceOptions = async (
     datasourceId: string,

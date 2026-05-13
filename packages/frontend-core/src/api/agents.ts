@@ -216,7 +216,11 @@ export const buildAgentEndpoints = (API: BaseAPIClient): AgentEndpoints => ({
     })
   },
 
-  uploadAgentFile: async (agentId: string, file: File, operationId?: string) => {
+  uploadAgentFile: async (
+    agentId: string,
+    file: File,
+    operationId?: string
+  ) => {
     const formData = new FormData()
     formData.append("file", file)
     const query = operationId
@@ -229,7 +233,11 @@ export const buildAgentEndpoints = (API: BaseAPIClient): AgentEndpoints => ({
     })
   },
 
-  deleteAgentFile: async (agentId: string, fileId: string, operationId?: string) => {
+  deleteAgentFile: async (
+    agentId: string,
+    fileId: string,
+    operationId?: string
+  ) => {
     const query = operationId
       ? `?operationId=${encodeURIComponent(operationId)}`
       : ""
@@ -261,7 +269,11 @@ export const buildAgentEndpoints = (API: BaseAPIClient): AgentEndpoints => ({
     })
   },
 
-  connectAgentSharePointSite: async (agentId: string, body, operationId?: string) => {
+  connectAgentSharePointSite: async (
+    agentId: string,
+    body,
+    operationId?: string
+  ) => {
     const query = operationId
       ? `?operationId=${encodeURIComponent(operationId)}`
       : ""

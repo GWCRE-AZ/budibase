@@ -20,7 +20,12 @@
     ) => Promise<void> | void
   }
 
-  let { agentId, operationId, existingSiteIds = [], onCreated }: Props = $props()
+  let {
+    agentId,
+    operationId,
+    existingSiteIds = [],
+    onCreated,
+  }: Props = $props()
 
   let sharePointSites = $state<KnowledgeSourceOption[]>([])
   let sharePointConnectionOptions = $state<SharePointConnectionOption[]>([])
@@ -125,12 +130,16 @@
     }
     saving = true
     try {
-      await agentsStore.connectAgentSharePointSite(agentId, {
-        datasourceId: selectedDatasourceId,
-        authConfigId: selectedAuthConfigId,
-        siteId: selectedSiteId,
-        filters: mode === "selective" ? [EXCLUDE_ALL_PATTERN] : undefined,
-      }, operationId)
+      await agentsStore.connectAgentSharePointSite(
+        agentId,
+        {
+          datasourceId: selectedDatasourceId,
+          authConfigId: selectedAuthConfigId,
+          siteId: selectedSiteId,
+          filters: mode === "selective" ? [EXCLUDE_ALL_PATTERN] : undefined,
+        },
+        operationId
+      )
       await workspaceDeploymentStore.fetch()
       notifications.success("SharePoint site added")
       hide()
