@@ -324,12 +324,19 @@ export async function connectAgentSharePointSite(
   const nonSharePointSources = (targetOperation.knowledgeSources || []).filter(
     source => source.type !== AgentKnowledgeSourceType.SHAREPOINT
   )
+  const existingSharePointSources = (targetOperation.knowledgeSources || []).filter(
+    source => source.type === AgentKnowledgeSourceType.SHAREPOINT
+  )
   const updated = await sdk.ai.agents.update({
     ...existingAgent,
     operations: [
       {
         ...targetOperation,
-        knowledgeSources: [...nonSharePointSources, nextSource],
+        knowledgeSources: [
+          ...nonSharePointSources,
+          ...existingSharePointSources,
+          nextSource,
+        ],
       },
     ],
   })
