@@ -162,6 +162,7 @@ export type LoopStepOutputs = {
 export type BranchStepInputs = {
   branches: Branch[]
   children?: Record<string, AutomationStep[]>
+  evaluationOrder?: string[]
 }
 
 export type Branch = {
