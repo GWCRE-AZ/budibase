@@ -111,6 +111,7 @@ export async function status() {
         .map(operation => ({
           id: operation.id,
           name: operation.name,
+          live: operation.live,
           promptInstructions: operation.promptInstructions,
           enabledTools: normalizeArray(operation.enabledTools || []),
           knowledgeBases: normalizeArray(operation.knowledgeBases || []),
